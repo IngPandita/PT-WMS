@@ -1,0 +1,7 @@
+node_modules
+dist
+# Las pruebas de navegador no forman parte de la imagen que se sirve.
+e2e
+playwright.config.ts
+playwright-report
+test-results

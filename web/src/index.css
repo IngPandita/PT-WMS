@@ -1,0 +1,23 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root { color-scheme: light; }
+  body { @apply bg-tinta-50 text-tinta-900 antialiased; }
+  * { @apply border-tinta-200; }
+}
+
+@layer components {
+  .tarjeta   { @apply rounded-lg border border-tinta-200 bg-white; }
+  .etiqueta  { @apply text-2xs font-medium uppercase tracking-wide text-tinta-500; }
+  .campo     { @apply w-full rounded-md border border-tinta-300 bg-white px-2.5 py-1.5 text-sm
+                      outline-none transition focus:border-acento-500 focus:ring-2 focus:ring-acento-100; }
+  .boton     { @apply inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-sm
+                      font-medium transition disabled:cursor-not-allowed disabled:opacity-50; }
+  .boton-primario  { @apply boton bg-acento-600 text-white hover:bg-acento-700; }
+  .boton-secundario{ @apply boton border border-tinta-300 bg-white text-tinta-700 hover:bg-tinta-50; }
+  .boton-sutil     { @apply boton text-tinta-600 hover:bg-tinta-100; }
+  /* Acciones que quitan algo de circulacion: baja logica, cancelacion. */
+  .boton-peligro   { @apply boton bg-rose-600 text-white hover:bg-rose-700; }
+}

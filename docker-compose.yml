@@ -1,0 +1,83 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_PASSWORD: wms
+      POSTGRES_DB: wms
+    volumes:
+      - datos:/var/lib/postgresql/data
+    # La sonda pregunta por TCP a proposito. La imagen levanta un servidor
+    # TEMPORAL durante initdb que escucha SOLO en el socket unix: sondear por
+    # socket declara "healthy" en plena ventana de inicializacion y el
+    # migrador arranca contra un servidor que esta a punto de apagarse.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U postgres -d wms"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+      start_period: 20s
+
+  # Aplica migraciones y semilla, y termina. La API no arranca hasta que este
+  # servicio salga con exito.
+  #
+  # Lleva un registro de lo ya aplicado para que `docker compose up` sea
+  # RE-EJECUTABLE: sin el, la segunda corrida sobre un volumen existente
+  # fallaria al recrear objetos que ya existen.
+  #
+  # ON_ERROR_STOP=1 es obligatorio: sin esa bandera psql imprime los errores y
+  # aun asi sale con codigo 0, y una migracion rota pasaria por buena.
+  migrador:
+    image: postgres:16-alpine
+    depends_on:
+      db: { condition: service_healthy }
+    environment:
+      PGPASSWORD: wms
+    volumes:
+      - ./db:/db:ro
+    command:
+      - sh
+      - -c
+      - |
+        set -e
+        PSQL="psql -h db -U postgres -d wms -v ON_ERROR_STOP=1 -q"
+        $$PSQL -c "create table if not exists public.migraciones_aplicadas (
+                     archivo text primary key, aplicada_en timestamptz not null default now())"
+        for f in /db/migraciones/*.sql; do
+          nombre=$$(basename "$$f")
+          ya=$$($$PSQL -tAX -c "select 1 from public.migraciones_aplicadas where archivo='$$nombre'")
+          if [ "$$ya" = "1" ]; then
+            echo "omitida  $$nombre (ya aplicada)"
+          else
+            echo "aplicando $$nombre"
+            # La migracion y su registro confirman o fracasan juntos.
+            $$PSQL --single-transaction \
+              -f "$$f" \
+              -c "insert into public.migraciones_aplicadas (archivo) values ('$$nombre')"
+          fi
+        done
+        sembrados=$$($$PSQL -tAX -c "select count(*) from wms.cat_usuarios")
+        if [ "$$sembrados" = "0" ]; then
+          echo "sembrando datos iniciales"
+          $$PSQL -f /db/semilla.sql
+        else
+          echo "la semilla ya estaba aplicada ($$sembrados operadores)"
+        fi
+        echo "base lista"
+
+  api:
+    build: { context: ., dockerfile: Dockerfile.api }
+    depends_on:
+      migrador: { condition: service_completed_successfully }
+    environment:
+      WMS_CONEXION: "Host=db;Port=5432;Database=wms;Username=postgres;Password=wms"
+    # 8081 y 5174 por defecto para no chocar con servicios ya publicados en la
+    # maquina. Se ajustan con PUERTO_API y PUERTO_WEB.
+    ports: ["${PUERTO_API:-8081}:8080"]
+
+  web:
+    build: { context: ./web }
+    depends_on: [api]
+    ports: ["${PUERTO_WEB:-5174}:80"]
+
+volumes:
+  datos:

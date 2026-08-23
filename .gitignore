@@ -1,0 +1,11 @@
+bin/
+obj/
+node_modules/
+*.user
+.tmp-verificacion/
+dist/
+# Artefactos de Playwright: trazas, capturas y reportes de la ultima corrida.
+web/test-results/
+web/playwright-report/
+# Cache incremental de tsc -b.
+*.tsbuildinfo
